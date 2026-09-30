@@ -27,7 +27,7 @@
     const signup=byId("signup");
     const button=byId("authBtn");
     if(signup) signup.classList.toggle("hidden",mode==="login");
-    if(button) button.textContent=mode==="login"?"Sign in":"Create account";
+    if(button) button.textContent=mode==="login"?"Se connecter":"Créer un compte";
   }
 
   async function requestAuth(path,payload){
@@ -73,13 +73,13 @@
       const name=byId("name")?.value.trim()||"";
       const button=byId("authBtn");
 
-      if(!email){setMessage("Enter your email.");return;}
-      if(password.length<6){setMessage("Password must be at least 6 characters.");return;}
-      if(mode==="signup" && !name){setMessage("Enter your full name.");return;}
+      if(!email){setMessage("Saisissez votre adresse e-mail.");return;}
+      if(password.length<6){setMessage("Le mot de passe doit contenir au moins 6 caractères.");return;}
+      if(mode==="signup" && !name){setMessage("Saisissez votre nom complet.");return;}
 
       if(button){
         button.disabled=true;
-        button.textContent=mode==="login"?"Signing in…":"Creating account…";
+        button.textContent=mode==="login"?"Connexion…":"Création du compte…";
       }
       setMessage("");
 
@@ -89,18 +89,18 @@
           :await requestAuth("/signup",{email,password,data:{full_name:name,role:"teacher"}});
 
         if(mode==="signup" && !data?.access_token){
-          setMessage("Account created. Check your email to confirm it, then sign in.");
+          setMessage("Compte créé. Vérifiez votre e-mail pour confirmer votre compte, puis connectez-vous.");
           return;
         }
 
         if(!saveSession(data)){
-          setMessage("Authentication succeeded but no session was returned. Please try again.");
+          setMessage("La connexion a réussi, mais aucune session n’a été reçue. Réessayez.");
           return;
         }
 
         window.location.reload();
       }catch(error){
-        setMessage(error?.message||"Could not sign in. Please check your email and password.");
+        setMessage(error?.message||"Impossible de vous connecter. Vérifiez votre e-mail et votre mot de passe.");
       }finally{
         if(button){
           button.disabled=false;
