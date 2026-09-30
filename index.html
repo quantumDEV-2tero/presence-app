@@ -11,7 +11,7 @@
 <section id="dash" class="hidden"><div class="head"><div><span class="eyebrow">DASHBOARD</span><h2 id="welcome"></h2><p class="muted" id="roleText"></p></div></div>
 <div id="teacher" class="hidden"><div class="card"><h3>Create a class</h3><p class="muted">Students will use the generated code to join.</p><form id="createForm" class="formrow"><input id="className" placeholder="Class name" required><input id="course" placeholder="Course code"><button class="primary">Create</button></form><p class="msg" id="createMsg"></p></div><div class="card" style="margin-top:18px"><h3>Your classes</h3><div id="teacherList"></div></div></div>
 <div id="student" class="hidden"><div class="card"><h3>Join a class</h3><form id="joinForm" class="formrow"><input id="joinCode" placeholder="Class code" maxlength="8" required><span></span><button class="primary">Join</button></form><p class="msg" id="joinMsg"></p></div><div class="card" style="margin-top:18px"><h3>My classes</h3><div id="studentList"></div></div></div></section>
-<section id="classView" class="hidden"><button class="ghost" id="back">← Dashboard</button><div class="head" style="margin-top:22px"><div><span class="eyebrow">CLASS</span><h2 id="classTitle"></h2><p class="muted" id="classMeta"></p></div><div class="code" id="classCode"></div></div><div class="grid" style="align-items:start;grid-template-columns:.8fr 1.2fr"><div class="card"><h3>Student QR code</h3><p class="muted">Students scan this once to register for the class. They do not need an account.</p><div class="qrbox"><img id="qrImage" alt="Student class QR code"><div class="studentlink" id="studentLink"></div><button class="ghost" id="copyStudentLink">Copy student link</button></div></div><div class="card"><div class="head"><div><h3>Attendance sessions</h3><p class="muted">Start a new session for each lecture.</p></div><button class="primary" id="startSession">Start attendance</button></div><p class="msg" id="sessionMsg"></p><div id="sessionList"></div></div></div><div class="card" style="margin-top:18px"><div class="head"><div><h3>Selected session records</h3><p class="muted">Students marked present in the selected lecture.</p></div><button class="ghost" id="downloadSelected">Download CSV</button></div><div id="attendanceList"></div></div></section>
+<section id="classView" class="hidden"><button class="ghost" id="back">← Dashboard</button><div class="head" style="margin-top:22px"><div><span class="eyebrow">CLASS</span><h2 id="classTitle"></h2><p class="muted" id="classMeta"></p></div><div class="code" id="classCode"></div></div><div class="grid" style="align-items:start;grid-template-columns:.8fr 1.2fr"><div class="card"><h3>Student QR code</h3><p class="muted">Students scan this once to register for the class. They do not need an account.</p><div class="qrbox"><img id="qrImage" alt="Student class QR code"><div class="studentlink" id="studentLink"></div><button class="ghost" id="copyStudentLink">Copy student link</button></div></div><div class="card"><div class="head"><div><h3>Attendance sessions</h3><p class="muted">Start a new session for each lecture.</p></div><button class="primary" id="startSession">Start attendance</button></div><p class="msg" id="sessionMsg"></p><div id="sessionList"></div></div></div><div class="card" style="margin-top:18px"><div class="head"><div><h3>Selected session records</h3><p class="muted" id="selectedSessionInfo">Choose a lecture above to view its attendance.</p></div><button class="ghost" id="downloadSelected" disabled>Download CSV</button></div><p class="msg" id="attendanceMsg"></p><div id="attendanceList"></div></div></section>
 </main>
 <script src="auth.js?v=1"></script>
 <script>
@@ -177,7 +177,7 @@ async function loadSessions(c){
   q.data.forEach(s=>{
     let r=document.createElement("div");
     r.className="row";
-    r.innerHTML='<div><strong></strong><small></small></div><div class="actions"><button class="ghost viewBtn">View</button><button class="ghost downloadBtn">Download</button><button class="primary endBtn">End session</button></div>';
+    r.innerHTML='<div><strong></strong><small></small></div><div class="actions"><button type="button" class="ghost viewBtn">View</button><button type="button" class="ghost downloadBtn">Download</button><button type="button" class="primary endBtn">End session</button></div>';
     r.querySelector("strong").textContent=s.status==="open"?"Open session":"Closed session";
     r.querySelector("small").textContent=new Date(s.started_at).toLocaleString();
     r.querySelector(".viewBtn").onclick=()=>loadSessionAttendance(s);
@@ -193,12 +193,38 @@ async function loadSessions(c){
 }let selectedSession=null;
 async function loadSessionAttendance(s){
   selectedSession=s;
-  $("downloadSelected").disabled=false;
-  let q=await db.from("attendance").select("status,attended_at,students(full_name,student_number)").eq("session_id",s.id).order("attended_at",{ascending:false}),box=$("attendanceList");
-  box.innerHTML="";
-  if(q.error){box.innerHTML='<div class="empty">Could not load attendance records.</div>';return}
-  if(!q.data?.length){box.innerHTML='<div class="empty">No students have checked in yet.</div>';return}
-  q.data.forEach(a=>{let r=document.createElement("div");r.className="row";r.innerHTML='<div><strong></strong><small></small></div><span class="status"></span>';r.querySelector("strong").textContent=a.students?.full_name||"Student";r.querySelector("small").textContent=a.students?.student_number||"";r.querySelector(".status").textContent=a.status+" • "+new Date(a.attended_at).toLocaleString();box.append(r)})
+  const info=$("selectedSessionInfo");
+  const box=$("attendanceList");
+  const download=$("downloadSelected");
+  setmsg("attendanceMsg","");
+  info.textContent=(s.status==="open"?"Open":"Closed")+" lecture • Started "+new Date(s.started_at).toLocaleString();
+  download.disabled=false;
+  box.innerHTML='<div class="empty">Loading attendance records…</div>';
+  box.scrollIntoView({behavior:"smooth",block:"start"});
+  try{
+    const q=await db.from("attendance").select("status,attended_at,students(full_name,student_number)").eq("session_id",s.id).order("attended_at",{ascending:false});
+    if(q.error) throw q.error;
+    box.innerHTML="";
+    const rows=q.data||[];
+    if(!rows.length){
+      box.innerHTML='<div class="empty">No students have checked in for this lecture.</div>';
+      setmsg("attendanceMsg","0 students marked present.");
+      return;
+    }
+    setmsg("attendanceMsg",rows.length+" student"+(rows.length===1?"":"s")+" recorded.");
+    rows.forEach(a=>{
+      const r=document.createElement("div");
+      r.className="row";
+      r.innerHTML='<div><strong></strong><small></small></div><span class="status"></span>';
+      r.querySelector("strong").textContent=a.students?.full_name||"Student";
+      r.querySelector("small").textContent=a.students?.student_number||"";
+      r.querySelector(".status").textContent=(a.status||"present")+" • "+new Date(a.attended_at).toLocaleString();
+      box.append(r);
+    });
+  }catch(err){
+    box.innerHTML='<div class="empty">Could not load this lecture’s attendance.</div>';
+    setmsg("attendanceMsg",err?.message||"Could not load attendance records.");
+  }
 }
 
 $("downloadSelected").disabled=true;
