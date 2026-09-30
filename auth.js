@@ -137,6 +137,7 @@
         if(!saveSession(data))
           throw new Error("Supabase a répondu sans session utilisateur.");
         setMessage("Connexion réussie…");
+        window.__presencePendingAuth=data;
         window.dispatchEvent(new CustomEvent("presence-authenticated",{detail:data}));
         return false;
       }
@@ -160,7 +161,8 @@
         throw new Error("Le compte a été créé, mais Supabase n’a pas renvoyé de session.");
 
       setMessage("Compte créé avec succès…");
-      window.dispatchEvent(new Event("presence-authenticated"));
+      window.__presencePendingAuth=data;
+      window.dispatchEvent(new CustomEvent("presence-authenticated",{detail:data}));
       return false;
     }catch(error){
       localStorage.removeItem("presence_session");
