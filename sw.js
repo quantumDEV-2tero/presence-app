@@ -1,4 +1,4 @@
-const CACHE_NAME="presence-shell-v10";
+const CACHE_NAME="presence-shell-v11";
 const APP_SHELL=["./","./index.html","./logo.svg","./manifest.webmanifest"];
 
 self.addEventListener("install",event=>{
