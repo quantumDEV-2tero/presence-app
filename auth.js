@@ -136,7 +136,12 @@
         const data=await requestAuth("/token?grant_type=password",{email,password});
         if(!saveSession(data))
           throw new Error("Supabase a répondu sans session utilisateur.");
-        window.location.replace(window.location.href.split("#")[0]);
+        setMessage("Connexion réussie…");
+        if(typeof window.boot==="function"){
+          await window.boot();
+        }else{
+          throw new Error("Impossible d’initialiser le tableau de bord.");
+        }
         return false;
       }
 
@@ -158,7 +163,12 @@
       if(!saveSession(data))
         throw new Error("Le compte a été créé, mais Supabase n’a pas renvoyé de session.");
 
-      window.location.replace(window.location.href.split("#")[0]);
+      setMessage("Compte créé avec succès…");
+      if(typeof window.boot==="function"){
+        await window.boot();
+      }else{
+        throw new Error("Impossible d’initialiser le tableau de bord.");
+      }
       return false;
     }catch(error){
       localStorage.removeItem("presence_session");
