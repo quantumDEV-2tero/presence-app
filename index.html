@@ -182,13 +182,12 @@ function cForDownloadName(s){
 }
 async function endSession(s,c){
   if(s.status!=="open")return;
-  const ok=window.confirm("Clôturer cette séance ? Les étudiants ne pourront plus enregistrer leur présence.");
-  if(!ok)return;
-  const q=await db.from("attendance_sessions").update({status:"closed",ended_at:new Date().toISOString()}).eq("id",s.id);
+  const endedAt=new Date().toISOString();
+  const q=await db.from("attendance_sessions").update({status:"closed",ended_at:endedAt}).eq("id",s.id);
   if(q.error){setmsg("sessionMsg",q.error.message);return}
-  setmsg("sessionMsg","Séance de présence clôturée.");
+  setmsg("sessionMsg","");
   await loadSessions(c);
-  await loadSessionAttendance({...s,status:"closed",ended_at:new Date().toISOString()});
+  await loadSessionAttendance({...s,status:"closed",ended_at:endedAt});
 }
 async function loadSessions(c){
   const startBtn=$("startSession");
