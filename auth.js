@@ -192,6 +192,8 @@
     });
 
     form.onsubmit=handleSubmit;
+    const authButton=byId("authBtn");
+    if(authButton)authButton.onclick=()=>form.requestSubmit();
     form.dataset.authBound="1";
     setMode(mode);
   }
