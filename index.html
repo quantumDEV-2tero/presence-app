@@ -142,6 +142,7 @@ const db={
       if(!session?.access_token)return {data:{user:null},error:null};
       try{const d=await http(AUTH_URL+"/user");return {data:{user:d},error:null}}catch(error){saveSession(null);return {data:{user:null},error}}
     },
+    async updatePassword(password){try{const d=await http(AUTH_URL+"/user",{method:"PUT",body:JSON.stringify({password})});return {data:d,error:null}}catch(error){return {data:null,error}}},
     async signOut(){try{if(session?.access_token)await http(AUTH_URL+"/logout",{method:"POST"})}catch(e){}saveSession(null)},
     onAuthStateChange(){return {data:{subscription:{unsubscribe(){}}}}}
   }
