@@ -1,0 +1,19 @@
+{
+  "name": "Presence",
+  "short_name": "Presence",
+  "description": "Gestion des présences pour les enseignants",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#060b16",
+  "theme_color": "#060b16",
+  "lang": "fr",
+  "icons": [
+    {
+      "src": "logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
