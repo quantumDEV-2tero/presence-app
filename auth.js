@@ -104,7 +104,7 @@
       }finally{
         if(button){
           button.disabled=false;
-          button.textContent=mode==="login"?"Sign in":"Create account";
+          button.textContent=mode==="login"?"Se connecter":"Créer un compte";
         }
       }
     },true);
