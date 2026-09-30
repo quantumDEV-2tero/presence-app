@@ -11,7 +11,7 @@
 <section id="dash" class="hidden"><div class="head"><div><span class="eyebrow">DASHBOARD</span><h2 id="welcome"></h2><p class="muted" id="roleText"></p></div></div>
 <div id="teacher" class="hidden"><div class="card"><h3>Create a class</h3><p class="muted">Students will use the generated code to join.</p><form id="createForm" class="formrow"><input id="className" placeholder="Class name" required><input id="course" placeholder="Course code"><button class="primary">Create</button></form><p class="msg" id="createMsg"></p></div><div class="card" style="margin-top:18px"><h3>Your classes</h3><div id="teacherList"></div></div></div>
 <div id="student" class="hidden"><div class="card"><h3>Join a class</h3><form id="joinForm" class="formrow"><input id="joinCode" placeholder="Class code" maxlength="8" required><span></span><button class="primary">Join</button></form><p class="msg" id="joinMsg"></p></div><div class="card" style="margin-top:18px"><h3>My classes</h3><div id="studentList"></div></div></div></section>
-<section id="classView" class="hidden"><button class="ghost" id="back">← Dashboard</button><div class="head" style="margin-top:22px"><div><span class="eyebrow">CLASS</span><h2 id="classTitle"></h2><p class="muted" id="classMeta"></p></div><div class="code" id="classCode"></div></div><div class="grid" style="align-items:start;grid-template-columns:.8fr 1.2fr"><div class="card"><h3>Student QR code</h3><p class="muted">Students scan this once to register for the class. They do not need an account.</p><div class="qrbox"><img id="qrImage" alt="Student class QR code"><div class="studentlink" id="studentLink"></div><button class="ghost" id="copyStudentLink">Copy student link</button></div></div><div class="card"><div class="head"><div><h3>Attendance sessions</h3><p class="muted">Start a new session for each lecture.</p></div><button class="primary" id="startSession">Start attendance</button></div><div id="sessionList"></div></div></div><div class="card" style="margin-top:18px"><h3>Selected session records</h3><div id="attendanceList"></div></div></section>
+<section id="classView" class="hidden"><button class="ghost" id="back">← Dashboard</button><div class="head" style="margin-top:22px"><div><span class="eyebrow">CLASS</span><h2 id="classTitle"></h2><p class="muted" id="classMeta"></p></div><div class="code" id="classCode"></div></div><div class="grid" style="align-items:start;grid-template-columns:.8fr 1.2fr"><div class="card"><h3>Student QR code</h3><p class="muted">Students scan this once to register for the class. They do not need an account.</p><div class="qrbox"><img id="qrImage" alt="Student class QR code"><div class="studentlink" id="studentLink"></div><button class="ghost" id="copyStudentLink">Copy student link</button></div></div><div class="card"><div class="head"><div><h3>Attendance sessions</h3><p class="muted">Start a new session for each lecture.</p></div><button class="primary" id="startSession">Start attendance</button></div><p class="msg" id="sessionMsg"></p><div id="sessionList"></div></div></div><div class="card" style="margin-top:18px"><h3>Selected session records</h3><div id="attendanceList"></div></div></section>
 </main>
 <script>
 const $=x=>document.getElementById(x),show=x=>$(x).classList.remove("hidden"),hide=x=>$(x).classList.add("hidden"),setmsg=(x,t)=>{const el=$(x);if(el)el.textContent=t||""};
@@ -78,8 +78,51 @@ $("joinForm").onsubmit=async e=>{e.preventDefault();let q=await db.rpc("join_cla
 async function loadTeacher(){let q=await db.from("classes").select("*").eq("teacher_id",user.id).order("created_at",{ascending:false}),box=$("teacherList");box.innerHTML="";if(!q.data?.length){box.innerHTML='<div class="empty">No classes yet.</div>';return}q.data.forEach(c=>{let r=document.createElement("div");r.className="row";r.innerHTML='<div><strong></strong><small></small></div><div><span class="code"></span> <button class="ghost">View</button></div>';r.querySelector("strong").textContent=c.name;r.querySelector("small").textContent=c.course_code||"Class";r.querySelector(".code").textContent=c.join_code;r.querySelector("button").onclick=()=>openClass(c);box.append(r)})}
 async function loadStudent(){let q=await db.from("enrollments").select("class_id,classes(id,name,course_code,teacher_name)").order("created_at",{ascending:false}),box=$("studentList");box.innerHTML="";if(!q.data?.length){box.innerHTML='<div class="empty">Join your first class above.</div>';return}for(const e of q.data){let c=e.classes,s=await db.from("attendance_sessions").select("id,started_at").eq("class_id",c.id).eq("status","open").order("started_at",{ascending:false}).limit(1).maybeSingle(),a=s.data?await db.from("attendance").select("status").eq("session_id",s.data.id).eq("student_id",student.id).maybeSingle():{data:null},r=document.createElement("div");r.className="row";r.innerHTML='<div><strong></strong><small></small></div><button class="primary"></button>';r.querySelector("strong").textContent=c.name;r.querySelector("small").textContent=(c.course_code||"")+" • "+(c.teacher_name||"Teacher");let b=r.querySelector("button");if(!s.data){b.textContent="No active session";b.disabled=true}else if(a.data){b.textContent="✓ "+a.data.status;b.disabled=true}else{b.textContent="Mark present";b.onclick=async()=>{let z=await db.from("attendance").insert({session_id:s.data.id,class_id:c.id,student_id:student.id,status:"present"});if(z.error)setmsg("joinMsg",z.error.message);else loadStudent()}}box.append(r)}}
 async function openClass(c){hide("dash");show("classView");$("classTitle").textContent=c.name;$("classMeta").textContent=(c.course_code||"")+" • "+(c.teacher_name||"Teacher");$("classCode").textContent=c.join_code;let link=location.origin+location.pathname+"?join="+encodeURIComponent(c.join_code);$("studentLink").textContent=link;$("qrImage").src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data="+encodeURIComponent(link);$("copyStudentLink").onclick=async()=>{try{await navigator.clipboard.writeText(link);$("copyStudentLink").textContent="Copied";setTimeout(()=>$("copyStudentLink").textContent="Copy student link",1500)}catch(e){setmsg("createMsg","Copy failed. Use the link shown below the QR code.")}};await loadSessions(c)}
-async function loadSessions(c){let q=await db.from("attendance_sessions").select("*").eq("class_id",c.id).order("started_at",{ascending:false}),box=$("sessionList");box.innerHTML="";if(!q.data?.length){box.innerHTML='<div class="empty">No sessions yet. Start attendance when class begins.</div>';$("attendanceList").innerHTML='<div class="empty">Select a session to view records.</div>';return}q.data.forEach(s=>{let r=document.createElement("div");r.className="row";r.innerHTML='<div><strong></strong><small></small></div><button class="ghost">View</button>';r.querySelector("strong").textContent=s.status==="open"?"Open session":"Closed session";r.querySelector("small").textContent=new Date(s.started_at).toLocaleString();r.querySelector("button").onclick=()=>loadSessionAttendance(s)});q.data.forEach(s=>{let r=document.createElement("div");r.className="row";r.innerHTML='<div><strong></strong><small></small></div><button class="ghost">View</button>';r.querySelector("strong").textContent=s.status==="open"?"Open session":"Closed session";r.querySelector("small").textContent=new Date(s.started_at).toLocaleString();r.querySelector("button").onclick=()=>loadSessionAttendance(s);box.append(r)});$("startSession").onclick=async()=>{let z=await db.from("attendance_sessions").insert({class_id:c.id,created_by:user.id,status:"open"});if(z.error)setmsg("createMsg",z.error.message);else loadSessions(c)}}
-async function loadSessionAttendance(s){let q=await db.from("attendance").select("status,attended_at,students(full_name,student_number)").eq("session_id",s.id).order("attended_at",{ascending:false}),box=$("attendanceList");box.innerHTML="";if(!q.data?.length){box.innerHTML='<div class="empty">No students have checked in yet.</div>';return}q.data.forEach(a=>{let r=document.createElement("div");r.className="row";r.innerHTML='<div><strong></strong><small></small></div><span class="status"></span>';r.querySelector("strong").textContent=a.students?.full_name||"Student";r.querySelector("small").textContent=a.students?.student_number||"";r.querySelector(".status").textContent=a.status+" • "+new Date(a.attended_at).toLocaleString();box.append(r)})}
+async function loadSessions(c){
+  const startBtn=$("startSession");
+  const box=$("sessionList");
+  startBtn.onclick=async()=>{
+    startBtn.disabled=true;
+    startBtn.textContent="Starting…";
+    setmsg("sessionMsg","");
+    try{
+      const z=await db.from("attendance_sessions").insert({class_id:c.id,created_by:user.id,status:"open"});
+      if(z.error){
+        setmsg("sessionMsg",z.error.message);
+        return;
+      }
+      setmsg("sessionMsg","Attendance is now open.");
+      await loadSessions(c);
+    }catch(err){
+      setmsg("sessionMsg",err?.message||"Could not start attendance.");
+    }finally{
+      startBtn.disabled=false;
+      startBtn.textContent="Start attendance";
+    }
+  };
+
+  const q=await db.from("attendance_sessions").select("*").eq("class_id",c.id).order("started_at",{ascending:false});
+  box.innerHTML="";
+  if(q.error){
+    box.innerHTML='<div class="empty">Could not load attendance sessions.</div>';
+    setmsg("sessionMsg",q.error.message);
+    return;
+  }
+  if(!q.data?.length){
+    box.innerHTML='<div class="empty">No sessions yet. Start attendance when class begins.</div>';
+    $("attendanceList").innerHTML='<div class="empty">Select a session to view records.</div>';
+    return;
+  }
+  q.data.forEach(s=>{
+    let r=document.createElement("div");
+    r.className="row";
+    r.innerHTML='<div><strong></strong><small></small></div><button class="ghost">View</button>';
+    r.querySelector("strong").textContent=s.status==="open"?"Open session":"Closed session";
+    r.querySelector("small").textContent=new Date(s.started_at).toLocaleString();
+    r.querySelector("button").onclick=()=>loadSessionAttendance(s);
+    box.append(r);
+  });
+}async function loadSessionAttendance(s){let q=await db.from("attendance").select("status,attended_at,students(full_name,student_number)").eq("session_id",s.id).order("attended_at",{ascending:false}),box=$("attendanceList");box.innerHTML="";if(!q.data?.length){box.innerHTML='<div class="empty">No students have checked in yet.</div>';return}q.data.forEach(a=>{let r=document.createElement("div");r.className="row";r.innerHTML='<div><strong></strong><small></small></div><span class="status"></span>';r.querySelector("strong").textContent=a.students?.full_name||"Student";r.querySelector("small").textContent=a.students?.student_number||"";r.querySelector(".status").textContent=a.status+" • "+new Date(a.attended_at).toLocaleString();box.append(r)})}
 $("back").onclick=()=>{hide("classView");show("dash");loadTeacher()};
 let publicJoinCode=new URLSearchParams(location.search).get("join");let publicStudent=null;let publicPoll=null;
 async function loadPublicStudent(){if(!publicStudent)return;let q=await db.rpc("public_student_status",{p_access_token:publicStudent.token,p_class_id:publicStudent.class_id});if(q.error){setmsg("publicMsg",q.error.message);return}let b=$("markPresent");if(q.data?.status==="present"||q.data?.status==="already_marked"){b.textContent="✓ Attendance recorded";b.disabled=true;setmsg("publicMsg","You are marked present for the current session.");}else if(q.data?.status==="not_marked"){b.textContent="Mark me present";b.disabled=false;setmsg("publicMsg","Attendance is open. Tap the button when you are in class.");}else{b.textContent="Waiting for attendance";b.disabled=true;setmsg("publicMsg","Your registration is saved. Your teacher has not opened attendance yet.");}}
