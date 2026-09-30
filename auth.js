@@ -137,7 +137,7 @@
         if(!saveSession(data))
           throw new Error("Supabase a répondu sans session utilisateur.");
         setMessage("Connexion réussie…");
-        window.dispatchEvent(new Event("presence-authenticated"));
+        window.dispatchEvent(new CustomEvent("presence-authenticated",{detail:data}));
         return false;
       }
 
