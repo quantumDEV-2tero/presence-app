@@ -138,7 +138,7 @@
           throw new Error("Supabase a répondu sans session utilisateur.");
         setMessage("Connexion réussie…");
         window.__presencePendingAuth=data;
-        window.dispatchEvent(new CustomEvent("presence-authenticated",{detail:data}));
+        if(typeof window.__presenceEnterApp==="function"){await window.__presenceEnterApp(data);}else{window.dispatchEvent(new CustomEvent("presence-authenticated",{detail:data}));}
         return false;
       }
 
@@ -162,7 +162,7 @@
 
       setMessage("Compte créé avec succès…");
       window.__presencePendingAuth=data;
-      window.dispatchEvent(new CustomEvent("presence-authenticated",{detail:data}));
+      if(typeof window.__presenceEnterApp==="function"){await window.__presenceEnterApp(data);}else{window.dispatchEvent(new CustomEvent("presence-authenticated",{detail:data}));}
       return false;
     }catch(error){
       localStorage.removeItem("presence_session");
