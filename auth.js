@@ -9,21 +9,24 @@
   window.__presenceAuthInitialized=true;
 
   const byId=id=>document.getElementById(id);
-  const setMessage=msg=>{const el=byId("authMsg");if(el)el.textContent=msg||""};
+  const setMessage=msg=>{
+    const el=byId("authMsg");
+    if(el)el.textContent=msg||"";
+  };
 
   function isStudentJoin(){
     try{return new URLSearchParams(window.location.search).has("join")}
     catch(e){return false}
   }
-
   if(isStudentJoin())return;
 
   let mode="login";
 
   function setMode(next){
-    mode=next;
+    mode=next==="signup"?"signup":"login";
     document.querySelectorAll(".tab").forEach(tab=>{
       tab.classList.toggle("active",tab.dataset.mode===mode);
+      tab.setAttribute("aria-selected",String(tab.dataset.mode===mode));
     });
     const signup=byId("signup");
     const button=byId("authBtn");
@@ -40,34 +43,69 @@
     try{
       response=await fetch(AUTH_URL+path,{
         method:"POST",
-        headers:{apikey:SUPABASE_KEY,"Content-Type":"application/json"},
+        headers:{
+          apikey:SUPABASE_KEY,
+          "Content-Type":"application/json"
+        },
         body:JSON.stringify(payload),
         cache:"no-store"
       });
     }catch(error){
-      throw new Error("Impossible de contacter le service de connexion. Vérifiez votre connexion Internet et réessayez.");
+      throw new Error("Impossible de contacter Supabase. Vérifiez votre connexion Internet puis réessayez.");
     }
 
-    const body=await response.text();
+    const raw=await response.text();
     let data=null;
-    try{data=body?JSON.parse(body):null}catch(e){data=body}
+    try{data=raw?JSON.parse(raw):null}catch(e){data=raw}
 
     if(!response.ok){
       const message=data?.msg||data?.message||data?.error_description||data?.error;
-      throw new Error(message||("Échec de l’authentification ("+response.status+")."));
+      const error=new Error(message||("Erreur d’authentification ("+response.status+")."));
+      error.status=response.status;
+      error.code=data?.code||data?.error_code||"";
+      throw error;
     }
     return data;
   }
 
   function saveSession(data){
-    if(!data?.access_token)return false;
-    localStorage.setItem("presence_session",JSON.stringify(data));
+    if(!data?.access_token||!data?.user){
+      localStorage.removeItem("presence_session");
+      return false;
+    }
+    const session={
+      access_token:data.access_token,
+      refresh_token:data.refresh_token||null,
+      token_type:data.token_type||"bearer",
+      expires_in:data.expires_in||null,
+      expires_at:data.expires_at||null,
+      user:data.user
+    };
+    localStorage.setItem("presence_session",JSON.stringify(session));
     return true;
+  }
+
+  function friendlyAuthError(error,action){
+    const message=String(error?.message||"");
+    const lower=message.toLowerCase();
+    if(lower.includes("invalid login credentials"))
+      return "Adresse e-mail ou mot de passe incorrect.";
+    if(lower.includes("email not confirmed"))
+      return "Votre e-mail n’est pas encore confirmé. Vérifiez votre boîte de réception puis reconnectez-vous.";
+    if(lower.includes("user already registered"))
+      return "Un compte existe déjà avec cette adresse. Utilisez « Se connecter ».";
+    if(lower.includes("password should be at least"))
+      return "Le mot de passe doit contenir au moins 6 caractères.";
+    if(lower.includes("rate limit"))
+      return "Trop de tentatives. Attendez quelques instants puis réessayez.";
+    if(action==="signup")
+      return message||"Impossible de créer le compte. Réessayez.";
+    return message||"Impossible de vous connecter. Réessayez.";
   }
 
   async function handleSubmit(event){
     event.preventDefault();
-    event.stopPropagation();
+    event.stopImmediatePropagation();
 
     const email=(byId("email")?.value||"").trim().toLowerCase();
     const password=byId("password")?.value||"";
@@ -96,10 +134,9 @@
     try{
       if(mode==="login"){
         const data=await requestAuth("/token?grant_type=password",{email,password});
-        if(!saveSession(data)){
-          throw new Error("La connexion a réussi, mais aucune session n’a été reçue.");
-        }
-        window.location.href=window.location.pathname;
+        if(!saveSession(data))
+          throw new Error("Supabase a répondu sans session utilisateur.");
+        window.location.replace(window.location.href.split("#")[0]);
         return false;
       }
 
@@ -110,20 +147,22 @@
       });
 
       if(!data?.access_token){
-        setMessage("Compte créé. Vérifiez votre e-mail pour confirmer votre compte, puis connectez-vous.");
+        localStorage.removeItem("presence_session");
+        setMessage("Compte créé. Vérifiez votre e-mail pour confirmer le compte, puis utilisez « Se connecter ».");
         setMode("login");
         const emailInput=byId("email");
         if(emailInput)emailInput.value=email;
         return false;
       }
 
-      if(!saveSession(data)){
-        throw new Error("Le compte a été créé, mais aucune session n’a été reçue.");
-      }
-      window.location.href=window.location.pathname;
+      if(!saveSession(data))
+        throw new Error("Le compte a été créé, mais Supabase n’a pas renvoyé de session.");
+
+      window.location.replace(window.location.href.split("#")[0]);
       return false;
     }catch(error){
-      setMessage(error?.message||"Impossible de traiter la demande. Vérifiez vos informations et réessayez.");
+      localStorage.removeItem("presence_session");
+      setMessage(friendlyAuthError(error,mode));
       return false;
     }finally{
       if(button){
