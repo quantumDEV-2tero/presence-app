@@ -43,7 +43,7 @@
     let data=null;
     try{data=text?JSON.parse(text):null}catch(e){data=text;}
     if(!response.ok){
-      throw new Error(data?.msg||data?.message||data?.error_description||data?.error||"Authentication failed.");
+      throw new Error(data?.msg||data?.message||data?.error_description||data?.error||"Échec de l’authentification.");
     }
     return data;
   }
@@ -100,7 +100,7 @@
 
         window.location.reload();
       }catch(error){
-        setMessage(error?.message||"Impossible de vous connecter. Vérifiez votre e-mail et votre mot de passe.");
+        setMessage(error?.message||"Impossible de vous connecter. Vérifiez votre adresse e-mail et votre mot de passe.");
       }finally{
         if(button){
           button.disabled=false;
